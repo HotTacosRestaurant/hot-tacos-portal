@@ -24,26 +24,15 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 ```
 
-Si Firebase no está configurado, el portal usa **Vista local**. Cuando Firebase sí está configurado, exige inicio de sesión y nunca presenta como local una operación rechazada por Firestore.
+Si Firebase no está configurado o las reglas aún no incluyen las colecciones del portal, la aplicación usa **Vista local**.
 
 La aplicación utiliza estas colecciones exclusivas:
 
-- `portal_users`
 - `portal_initiatives`
 - `portal_areas`
 - `portal_units`
 
-El ajuste aditivo para Firestore está disponible dentro del portal en **Catálogos → Firebase**. No abras estas colecciones públicamente.
-
-Para autorizar una cuenta, habilita Google en Firebase Authentication y crea manualmente `portal_users/{uid}` con:
-
-```text
-active: true
-email: "usuario@ejemplo.com"
-role: "admin"
-```
-
-Los roles admitidos son `admin`, `manager` y `member`. Solo `admin` puede modificar catálogos.
+Las reglas del portal se agregan a las reglas existentes de Firestore. El portal no solicita inicio de sesión.
 
 ## Verificación
 

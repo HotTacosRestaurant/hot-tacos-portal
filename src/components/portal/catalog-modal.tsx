@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 
-import { FIRESTORE_PORTAL_RULES } from "@/lib/firestore-portal-rules";
 import type { PortalArea, PortalUnit } from "@/types/initiative";
 
 interface CatalogModalProps {
@@ -20,7 +19,7 @@ export function CatalogModal({
   onSaveArea,
   onSaveUnit,
 }: CatalogModalProps) {
-  const [tab, setTab] = useState<"areas" | "units" | "firebase">("areas");
+  const [tab, setTab] = useState<"areas" | "units">("areas");
   const [areaName, setAreaName] = useState("");
   const [unitCode, setUnitCode] = useState("");
   const [unitName, setUnitName] = useState("");
@@ -83,7 +82,6 @@ export function CatalogModal({
         <div className="catalog-tabs" role="tablist">
           <button className={tab === "areas" ? "active" : ""} type="button" onClick={() => setTab("areas")}>Áreas</button>
           <button className={tab === "units" ? "active" : ""} type="button" onClick={() => setTab("units")}>Unidades y sucursales</button>
-          <button className={tab === "firebase" ? "active" : ""} type="button" onClick={() => setTab("firebase")}>Firebase</button>
         </div>
 
         {tab === "areas" ? (
@@ -102,7 +100,7 @@ export function CatalogModal({
               <button className="button button-primary" type="submit" disabled={saving}>Agregar área</button>
             </form>
           </div>
-        ) : tab === "units" ? (
+        ) : (
           <div className="catalog-panel">
             <p className="catalog-help">Agrega nuevas sucursales, conceptos o unidades operativas sin cambiar el código.</p>
             <div className="catalog-list">
@@ -118,12 +116,6 @@ export function CatalogModal({
               <label className="field"><span>Nombre</span><input required value={unitName} onChange={(event) => setUnitName(event.target.value)} placeholder="Ej. Hot Tacos Toronto" /></label>
               <button className="button button-primary" type="submit" disabled={saving}>Agregar unidad</button>
             </form>
-          </div>
-        ) : (
-          <div className="catalog-panel rules-panel">
-            <p className="catalog-help"><strong>Estas reglas son únicamente aditivas.</strong> Pega el bloque antes de tu regla final <code>match /&#123;document=**&#125;</code>. No reemplaza promociones, formularios, catering ni ninguna colección existente.</p>
-            <button className="button button-primary copy-rules" type="button" onClick={() => void navigator.clipboard.writeText(FIRESTORE_PORTAL_RULES)}>Copiar ajuste de reglas</button>
-            <pre>{FIRESTORE_PORTAL_RULES}</pre>
           </div>
         )}
       </section>

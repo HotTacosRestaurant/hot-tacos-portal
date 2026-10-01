@@ -13,6 +13,8 @@ interface InitiativeModalProps {
   monthKey: string;
   areas: PortalArea[];
   units: PortalUnit[];
+  initialScopeType?: InitiativeScopeType;
+  initialUnitIds?: string[];
   onClose: () => void;
   onSubmit: (draft: InitiativeDraft) => Promise<void>;
 }
@@ -21,6 +23,8 @@ export function InitiativeModal({
   monthKey,
   areas,
   units,
+  initialScopeType = "brand",
+  initialUnitIds = [],
   onClose,
   onSubmit,
 }: InitiativeModalProps) {
@@ -29,8 +33,8 @@ export function InitiativeModal({
   const [eventDate, setEventDate] = useState(`${monthKey}-01`);
   const [location, setLocation] = useState("");
   const [owner, setOwner] = useState("");
-  const [scopeType, setScopeType] = useState<InitiativeScopeType>("brand");
-  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
+  const [scopeType, setScopeType] = useState<InitiativeScopeType>(initialScopeType);
+  const [selectedUnits, setSelectedUnits] = useState<string[]>(initialUnitIds);
   const activeAreas = areas.filter((area) => area.active);
   const activeUnits = units.filter((unit) => unit.active);
   const [selected, setSelected] = useState<string[]>(
