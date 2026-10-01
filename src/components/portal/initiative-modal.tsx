@@ -2,27 +2,25 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 
-import type { InitiativeDraft } from "@/types/initiative";
-
-const DEPARTMENTS = [
-  "Operaciones",
-  "Recursos Humanos",
-  "Compras",
-  "Inventario",
-  "Finanzas",
-  "Relaciones Públicas",
-  "Marketing",
-  "Tecnología y Sistemas",
-];
+import type {
+  InitiativeDraft,
+  InitiativeScopeType,
+  PortalArea,
+  PortalUnit,
+} from "@/types/initiative";
 
 interface InitiativeModalProps {
   monthKey: string;
+  areas: PortalArea[];
+  units: PortalUnit[];
   onClose: () => void;
   onSubmit: (draft: InitiativeDraft) => Promise<void>;
 }
 
 export function InitiativeModal({
   monthKey,
+  areas,
+  units,
   onClose,
   onSubmit,
 }: InitiativeModalProps) {
@@ -31,7 +29,13 @@ export function InitiativeModal({
   const [eventDate, setEventDate] = useState(`${monthKey}-01`);
   const [location, setLocation] = useState("");
   const [owner, setOwner] = useState("");
-  const [selected, setSelected] = useState<string[]>(["Operaciones"]);
+  const [scopeType, setScopeType] = useState<InitiativeScopeType>("brand");
+  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
+  const activeAreas = areas.filter((area) => area.active);
+  const activeUnits = units.filter((unit) => unit.active);
+  const [selected, setSelected] = useState<string[]>(
+    activeAreas.length ? [activeAreas[0].id] : [],
+  );
   const [saving, setSaving] = useState(false);
 
   const monthLabel = useMemo(
@@ -42,17 +46,30 @@ export function InitiativeModal({
     [monthKey],
   );
 
-  function toggleDepartment(department: string) {
+  function toggleDepartment(areaId: string) {
     setSelected((current) =>
-      current.includes(department)
-        ? current.filter((item) => item !== department)
-        : [...current, department],
+      current.includes(areaId)
+        ? current.filter((item) => item !== areaId)
+        : [...current, areaId],
+    );
+  }
+
+  function toggleUnit(unitId: string) {
+    setSelectedUnits((current) =>
+      current.includes(unitId)
+        ? current.filter((item) => item !== unitId)
+        : [...current, unitId],
     );
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!title.trim() || !owner.trim() || selected.length === 0) return;
+    if (
+      !title.trim() ||
+      !owner.trim() ||
+      selected.length === 0 ||
+      (scopeType === "units" && selectedUnits.length === 0)
+    ) return;
 
     setSaving(true);
     try {
@@ -64,12 +81,18 @@ export function InitiativeModal({
         location: location.trim(),
         owner: owner.trim(),
         status: "notified",
-        areas: selected.map((name) => ({
-          id: crypto.randomUUID(),
-          name,
-          status: "notified",
-          tasks: [],
-        })),
+        scopeType,
+        unitIds: scopeType === "brand" ? [] : selectedUnits,
+        areas: selected
+          .map((areaId) => areas.find((area) => area.id === areaId))
+          .filter((area): area is PortalArea => Boolean(area))
+          .map((area) => ({
+            id: crypto.randomUUID(),
+            catalogAreaId: area.id,
+            name: area.name,
+            status: "notified",
+            tasks: [],
+          })),
       });
       onClose();
     } finally {
@@ -107,6 +130,31 @@ export function InitiativeModal({
               placeholder="Ej. Food Truck en Windsor Eats"
             />
           </label>
+
+          <fieldset className="departments field-wide">
+            <legend>Alcance de la iniciativa *</legend>
+            <div className="scope-options">
+              <label className="scope-card">
+                <input type="radio" name="scope" checked={scopeType === "brand"} onChange={() => setScopeType("brand")} />
+                <span><strong>Toda la marca</strong><small>Aplica globalmente a Hot Tacos</small></span>
+              </label>
+              <label className="scope-card">
+                <input type="radio" name="scope" checked={scopeType === "units"} onChange={() => setScopeType("units")} />
+                <span><strong>Unidades específicas</strong><small>Una o varias sucursales o conceptos</small></span>
+              </label>
+            </div>
+            {scopeType === "units" && (
+              <div className="unit-picker">
+                {activeUnits.map((unit) => (
+                  <label className="check-card" key={unit.id}>
+                    <input type="checkbox" checked={selectedUnits.includes(unit.id)} onChange={() => toggleUnit(unit.id)} />
+                    <span><strong>{unit.code}</strong><small>{unit.name}</small></span>
+                  </label>
+                ))}
+                {activeUnits.length === 0 && <p className="catalog-help">No hay unidades activas. Agrégalas desde Catálogos.</p>}
+              </div>
+            )}
+          </fieldset>
 
           <label className="field">
             <span>Fecha *</span>
@@ -150,17 +198,18 @@ export function InitiativeModal({
           <fieldset className="departments field-wide">
             <legend>Áreas involucradas *</legend>
             <div className="department-grid">
-              {DEPARTMENTS.map((department) => (
-                <label className="check-card" key={department}>
+              {activeAreas.map((area) => (
+                <label className="check-card" key={area.id}>
                   <input
                     type="checkbox"
-                    checked={selected.includes(department)}
-                    onChange={() => toggleDepartment(department)}
+                    checked={selected.includes(area.id)}
+                    onChange={() => toggleDepartment(area.id)}
                   />
-                  <span>{department}</span>
+                  <span>{area.name}</span>
                 </label>
               ))}
             </div>
+            {activeAreas.length === 0 && <p className="catalog-help">No hay áreas activas. Agrégalas desde Catálogos.</p>}
           </fieldset>
 
           <div className="modal-actions field-wide">
@@ -176,4 +225,3 @@ export function InitiativeModal({
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 # Hot Tacos Portal
 
-Portal interno PWA para coordinar iniciativas, áreas responsables y tareas de Hot Tacos.
+Portal interno PWA para coordinar iniciativas, unidades, áreas responsables y tareas de Hot Tacos.
 
 ## Desarrollo
 
@@ -24,9 +24,26 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 ```
 
-Si Firebase no está configurado o las reglas de Firestore rechazan la operación, el portal cambia automáticamente a **Vista local**. En ese modo los datos solo existen en `localStorage` del navegador.
+Si Firebase no está configurado, el portal usa **Vista local**. Cuando Firebase sí está configurado, exige inicio de sesión y nunca presenta como local una operación rechazada por Firestore.
 
-No abras la colección públicamente para eliminar ese aviso. La siguiente fase debe agregar Firebase Authentication y reglas limitadas a los usuarios internos autorizados.
+La aplicación utiliza estas colecciones exclusivas:
+
+- `portal_users`
+- `portal_initiatives`
+- `portal_areas`
+- `portal_units`
+
+El ajuste aditivo para Firestore está disponible dentro del portal en **Catálogos → Firebase**. No abras estas colecciones públicamente.
+
+Para autorizar una cuenta, habilita Google en Firebase Authentication y crea manualmente `portal_users/{uid}` con:
+
+```text
+active: true
+email: "usuario@ejemplo.com"
+role: "admin"
+```
+
+Los roles admitidos son `admin`, `manager` y `member`. Solo `admin` puede modificar catálogos.
 
 ## Verificación
 

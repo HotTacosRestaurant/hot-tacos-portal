@@ -8,9 +8,16 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-import type { Initiative, InitiativeDraft } from "@/types/initiative";
+import type {
+  Initiative,
+  InitiativeDraft,
+  PortalArea,
+  PortalUnit,
+} from "@/types/initiative";
 
 const COLLECTION = "portal_initiatives";
+const AREAS_COLLECTION = "portal_areas";
+const UNITS_COLLECTION = "portal_units";
 
 function requireDatabase() {
   if (!db) throw new Error("Firebase is not configured.");
@@ -27,12 +34,64 @@ export function subscribeToInitiatives(
     collection(database, COLLECTION),
     (snapshot) => {
       const initiatives = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }) as Initiative)
+        .map((item) => normalizeInitiative({ id: item.id, ...item.data() } as Initiative))
         .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
       onData(initiatives);
     },
     (error) => onError(error),
   );
+}
+
+export function subscribeToAreas(
+  onData: (areas: PortalArea[]) => void,
+  onError: (error: Error) => void,
+) {
+  const database = requireDatabase();
+  return onSnapshot(
+    collection(database, AREAS_COLLECTION),
+    (snapshot) =>
+      onData(
+        snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }) as PortalArea)
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+      ),
+    onError,
+  );
+}
+
+export function subscribeToUnits(
+  onData: (units: PortalUnit[]) => void,
+  onError: (error: Error) => void,
+) {
+  const database = requireDatabase();
+  return onSnapshot(
+    collection(database, UNITS_COLLECTION),
+    (snapshot) =>
+      onData(
+        snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }) as PortalUnit)
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)),
+      ),
+    onError,
+  );
+}
+
+export async function saveArea(area: PortalArea) {
+  const database = requireDatabase();
+  const { id, ...data } = area;
+  await setDoc(doc(database, AREAS_COLLECTION, id), {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function saveUnit(unit: PortalUnit) {
+  const database = requireDatabase();
+  const { id, ...data } = unit;
+  await setDoc(doc(database, UNITS_COLLECTION, id), {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function createInitiative(draft: InitiativeDraft) {
@@ -59,3 +118,10 @@ export async function removeInitiative(id: string) {
   await deleteDoc(doc(database, COLLECTION, id));
 }
 
+function normalizeInitiative(initiative: Initiative): Initiative {
+  return {
+    ...initiative,
+    scopeType: initiative.scopeType ?? "brand",
+    unitIds: initiative.unitIds ?? [],
+  };
+}

@@ -13,17 +13,20 @@ import type {
   Initiative,
   InitiativeArea,
   InitiativeStatus,
+  PortalUnit,
   TaskStatus,
 } from "@/types/initiative";
 
 interface InitiativeCardProps {
   initiative: Initiative;
+  units: PortalUnit[];
   onChange: (initiative: Initiative) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
 
 export function InitiativeCard({
   initiative,
+  units,
   onChange,
   onDelete,
 }: InitiativeCardProps) {
@@ -57,6 +60,14 @@ export function InitiativeCard({
             <div className="initiative-meta">
               <span>{formatDate(initiative.eventDate)}</span>
               {initiative.location && <span>• {initiative.location}</span>}
+            </div>
+            <div className="scope-badges">
+              {initiative.scopeType === "units" && initiative.unitIds.length ? (
+                initiative.unitIds.map((unitId) => {
+                  const unit = units.find((item) => item.id === unitId);
+                  return <span className="scope-badge" key={unitId}>{unit?.code ?? unitId}</span>;
+                })
+              ) : <span className="scope-badge global">Toda la marca</span>}
             </div>
             <h3>{initiative.title}</h3>
           </div>
@@ -227,4 +238,3 @@ function formatDate(value: string) {
 function initials(name: string) {
   return name.split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
-
