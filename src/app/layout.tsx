@@ -3,13 +3,13 @@ import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Iniciativas | Hot Tacos Portal",
-  description: "Portal interno de coordinación de Hot Tacos",
-  applicationName: "Hot Tacos Portal",
+  title: "Iniciativas | Portal del Grupo Corporativo",
+  description: "Portal interno de coordinación del Grupo Corporativo",
+  applicationName: "Portal del Grupo Corporativo",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "HT Portal",
+    title: "Grupo Corporativo",
   },
 };
 

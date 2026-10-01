@@ -71,7 +71,7 @@ export function InitiativeCard({
                   const unit = units.find((item) => item.id === unitId);
                   return <span className="scope-badge" key={unitId}>{unit?.code ?? unitId}</span>;
                 })
-              ) : <span className="scope-badge global">Toda la marca</span>}
+              ) : <span className="scope-badge global">Toda el Grupo</span>}
             </div>
             <h3>{initiative.title}</h3>
           </div>

@@ -1,5 +1,5 @@
 export const FIRESTORE_PORTAL_RULES = `/*
-  HOT TACOS PORTAL
+  PORTAL DEL GRUPO CORPORATIVO  
   Pegar dentro de match /databases/{database}/documents,
   inmediatamente ANTES de la regla final match /{document=**}.
 */

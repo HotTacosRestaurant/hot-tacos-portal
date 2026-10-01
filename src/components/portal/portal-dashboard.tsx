@@ -143,7 +143,7 @@ export function PortalDashboard() {
   }, [scopeInitiatives]);
 
   const selectedUnit = units.find((unit) => unit.id === selectedScope);
-  const scopeTitle = selectedScope === "brand" ? "Toda la marca" : selectedUnit?.name ?? selectedScope;
+  const scopeTitle = selectedScope === "brand" ? "Toda el Grupo Corporativo" : selectedUnit?.name ?? selectedScope;
 
   function saveLocalInitiatives(next: Initiative[]) {
     setInitiatives(next);
@@ -221,7 +221,7 @@ export function PortalDashboard() {
   return (
     <main className="portal-shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="Hot Tacos Portal"><span className="brand-mark">HT</span><span><strong>HOT TACOS</strong><small>PORTAL INTERNO</small></span></a>
+        <a className="brand" href="#top" aria-label="Portal del Grupo Corporativo"><span className="brand-mark">HT</span><span><strong>GRUPO CORPORATIVO</strong><small>PORTAL INTERNO</small></span></a>
         <nav className="main-nav" aria-label="Navegación principal">
           <a className="active" href="#initiatives">Iniciativas</a>
           <button className="nav-button" type="button" onClick={() => openCatalog("areas")}>Catálogos</button>
@@ -239,9 +239,21 @@ export function PortalDashboard() {
         </section>
 
         <section className="scope-navigation" aria-label="Ámbito de iniciativas">
-          <button className={selectedScope === "brand" ? "active" : ""} type="button" onClick={() => setSelectedScope("brand")}><span className="scope-nav-code">HT</span><span><strong>Global</strong><small>Toda la marca</small></span></button>
+          <button className={selectedScope === "brand" ? "active" : ""} type="button" onClick={() => setSelectedScope("brand")}><span className="scope-nav-code">GC</span><span><strong>Global</strong><small>Toda el Grupo</small></span></button>
           {units.filter((unit) => unit.active).map((unit) => (
-            <button className={selectedScope === unit.id ? "active" : ""} type="button" key={unit.id} onClick={() => setSelectedScope(unit.id)}><span className="scope-nav-code">{unit.code}</span><span><strong>{unit.code}</strong><small>{unit.name.replace("Hot Tacos ", "")}</small></span></button>
+            <button
+              className={selectedScope === unit.id ? "active" : ""}
+              type="button"
+              key={unit.id}
+              onClick={() => setSelectedScope(unit.id)}
+            >
+              <span className="scope-nav-code">{unit.code}</span>
+
+              <span>
+                <strong>{unit.code}</strong>
+                <small>{unit.name}</small>
+              </span>
+            </button>
           ))}
         </section>
 

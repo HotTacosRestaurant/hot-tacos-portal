@@ -1,6 +1,6 @@
-# Hot Tacos Portal
+# Grupo Corporativo Portal
 
-Portal interno PWA para coordinar iniciativas, unidades, áreas responsables y tareas de Hot Tacos.
+Portal interno PWA para coordinar iniciativas, unidades, áreas responsables y tareas del Grupo Corporativo.
 
 ## Desarrollo
 

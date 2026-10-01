@@ -1,4 +1,4 @@
-const CACHE_NAME = "hot-tacos-portal-v1";
+const CACHE_NAME = "grupo-corporativo-portal-v2";
 const APP_SHELL = ["/"];
 
 self.addEventListener("install", (event) => {

@@ -154,7 +154,7 @@ export function InitiativeModal({
             <div className="scope-options">
               <label className="scope-card">
                 <input type="radio" name="scope" checked={scopeType === "brand"} onChange={() => setScopeType("brand")} />
-                <span><strong>Toda la marca</strong><small>Aplica globalmente a Hot Tacos</small></span>
+                <span><strong>Todo el grupo</strong><small>Aplica globalmente al Grupo Corporativo</small></span>
               </label>
               <label className="scope-card">
                 <input type="radio" name="scope" checked={scopeType === "units"} onChange={() => setScopeType("units")} />

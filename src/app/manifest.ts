@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Hot Tacos Portal",
-    short_name: "HT Portal",
-    description: "Portal interno de coordinación de Hot Tacos",
+    name: "Portal del Grupo Corporativo",
+    short_name: "GC Portal",
+    description: "Portal interno de coordinación del Grupo Corporativo",
     start_url: "/",
     display: "standalone",
     background_color: "#fbfaf7",
