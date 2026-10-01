@@ -6,6 +6,7 @@ import type {
   InitiativeDraft,
   InitiativeScopeType,
   PortalArea,
+  PortalPerson,
   PortalUnit,
 } from "@/types/initiative";
 
@@ -13,6 +14,7 @@ interface InitiativeModalProps {
   monthKey: string;
   areas: PortalArea[];
   units: PortalUnit[];
+  people: PortalPerson[];
   initialScopeType?: InitiativeScopeType;
   initialUnitIds?: string[];
   onClose: () => void;
@@ -23,6 +25,7 @@ export function InitiativeModal({
   monthKey,
   areas,
   units,
+  people,
   initialScopeType = "brand",
   initialUnitIds = [],
   onClose,
@@ -32,11 +35,15 @@ export function InitiativeModal({
   const [description, setDescription] = useState("");
   const [eventDate, setEventDate] = useState(`${monthKey}-01`);
   const [location, setLocation] = useState("");
-  const [owner, setOwner] = useState("");
+  const [ownerSelection, setOwnerSelection] = useState("");
+  const [customOwner, setCustomOwner] = useState("");
+  const [customOwnerPhone, setCustomOwnerPhone] = useState("");
+  const [customOwnerEmail, setCustomOwnerEmail] = useState("");
   const [scopeType, setScopeType] = useState<InitiativeScopeType>(initialScopeType);
   const [selectedUnits, setSelectedUnits] = useState<string[]>(initialUnitIds);
   const activeAreas = areas.filter((area) => area.active);
   const activeUnits = units.filter((unit) => unit.active);
+  const activePeople = people.filter((person) => person.active);
   const [selected, setSelected] = useState<string[]>(
     activeAreas.length ? [activeAreas[0].id] : [],
   );
@@ -68,9 +75,11 @@ export function InitiativeModal({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const selectedPerson = activePeople.find((person) => person.id === ownerSelection);
+    const owner = selectedPerson?.name ?? customOwner.trim();
     if (
       !title.trim() ||
-      !owner.trim() ||
+      !owner ||
       selected.length === 0 ||
       (scopeType === "units" && selectedUnits.length === 0)
     ) return;
@@ -83,7 +92,12 @@ export function InitiativeModal({
         eventDate,
         monthKey: eventDate.slice(0, 7),
         location: location.trim(),
-        owner: owner.trim(),
+        owner,
+        ownerPersonId: selectedPerson?.id,
+        ownerContact: {
+          phone: selectedPerson?.phone ?? customOwnerPhone.trim(),
+          email: selectedPerson?.email ?? customOwnerEmail.trim(),
+        },
         status: "notified",
         scopeType,
         unitIds: scopeType === "brand" ? [] : selectedUnits,
@@ -172,13 +186,24 @@ export function InitiativeModal({
 
           <label className="field">
             <span>Responsable general *</span>
-            <input
+            <select
               required
-              value={owner}
-              onChange={(event) => setOwner(event.target.value)}
-              placeholder="Nombre"
-            />
+              value={ownerSelection}
+              onChange={(event) => setOwnerSelection(event.target.value)}
+            >
+              <option value="">Selecciona una persona</option>
+              {activePeople.map((person) => <option value={person.id} key={person.id}>{person.name}{person.role ? ` · ${person.role}` : ""}</option>)}
+              <option value="other">Otro responsable…</option>
+            </select>
           </label>
+
+          {ownerSelection === "other" && (
+            <div className="custom-owner field-wide">
+              <label className="field"><span>Nombre del responsable *</span><input required value={customOwner} onChange={(event) => setCustomOwner(event.target.value)} placeholder="Nombre completo" /></label>
+              <label className="field"><span>Teléfono</span><input type="tel" value={customOwnerPhone} onChange={(event) => setCustomOwnerPhone(event.target.value)} placeholder="Teléfono" /></label>
+              <label className="field"><span>Correo</span><input type="email" value={customOwnerEmail} onChange={(event) => setCustomOwnerEmail(event.target.value)} placeholder="Correo" /></label>
+            </div>
+          )}
 
           <label className="field field-wide">
             <span>Ubicación</span>

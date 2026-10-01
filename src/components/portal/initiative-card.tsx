@@ -13,6 +13,8 @@ import type {
   Initiative,
   InitiativeArea,
   InitiativeStatus,
+  InitiativeTask,
+  PortalPerson,
   PortalUnit,
   TaskStatus,
 } from "@/types/initiative";
@@ -20,6 +22,7 @@ import type {
 interface InitiativeCardProps {
   initiative: Initiative;
   units: PortalUnit[];
+  people: PortalPerson[];
   onChange: (initiative: Initiative) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
@@ -27,6 +30,7 @@ interface InitiativeCardProps {
 export function InitiativeCard({
   initiative,
   units,
+  people,
   onChange,
   onDelete,
 }: InitiativeCardProps) {
@@ -95,7 +99,7 @@ export function InitiativeCard({
         <div className="initiative-summary">
           <div className="owner-chip">
             <span className="avatar">{initials(initiative.owner)}</span>
-            <span><small>Responsable</small>{initiative.owner}</span>
+            <span><small>Responsable</small>{initiative.owner}<OwnerContact contact={contactForOwner(initiative.ownerPersonId, initiative.ownerContact, people)} /></span>
           </div>
           <div className="summary-stat"><strong>{initiative.areas.length}</strong><span>áreas</span></div>
           <div className="summary-stat"><strong>{completedTasks}/{totalTasks}</strong><span>tareas</span></div>
@@ -116,6 +120,7 @@ export function InitiativeCard({
               <AreaPanel
                 key={area.id}
                 area={area}
+                people={people}
                 onChange={(update) => updateArea(area.id, update)}
               />
             ))}
@@ -137,29 +142,52 @@ export function InitiativeCard({
 
 function AreaPanel({
   area,
+  people,
   onChange,
 }: {
   area: InitiativeArea;
+  people: PortalPerson[];
   onChange: (update: (area: InitiativeArea) => InitiativeArea) => Promise<void>;
 }) {
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
-  const [owner, setOwner] = useState("");
+  const [ownerSelection, setOwnerSelection] = useState("");
+  const [customOwner, setCustomOwner] = useState("");
+  const [customOwnerPhone, setCustomOwnerPhone] = useState("");
+  const [customOwnerEmail, setCustomOwnerEmail] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const activePeople = people.filter((person) => person.active);
 
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!title.trim() || !owner.trim() || !dueDate) return;
+    const selectedPerson = activePeople.find((person) => person.id === ownerSelection);
+    const owner = selectedPerson?.name ?? customOwner.trim();
+    if (!title.trim() || !owner || !dueDate) return;
     await onChange((current) => ({
       ...current,
       status: current.status === "notified" ? "in_progress" : current.status,
       tasks: [
         ...current.tasks,
-        { id: crypto.randomUUID(), title: title.trim(), owner: owner.trim(), dueDate, status: "pending" },
+        {
+          id: crypto.randomUUID(),
+          title: title.trim(),
+          owner,
+          ownerPersonId: selectedPerson?.id,
+          ownerContact: {
+            phone: selectedPerson?.phone ?? customOwnerPhone.trim(),
+            email: selectedPerson?.email ?? customOwnerEmail.trim(),
+          },
+          dueDate,
+          status: "pending",
+          notes: [],
+        },
       ],
     }));
     setTitle("");
-    setOwner("");
+    setOwnerSelection("");
+    setCustomOwner("");
+    setCustomOwnerPhone("");
+    setCustomOwnerEmail("");
     setDueDate("");
     setAdding(false);
   }
@@ -186,30 +214,7 @@ function AreaPanel({
       {area.tasks.length > 0 && (
         <div className="task-list">
           {area.tasks.map((task) => (
-            <div className="task-row" key={task.id}>
-              <div className="task-copy"><strong>{task.title}</strong><span>{task.owner} · vence {formatDate(task.dueDate)}</span></div>
-              <select
-                className={`status-select compact ${statusTone(task.status)}`}
-                value={task.status}
-                aria-label={`Estado de ${task.title}`}
-                onChange={(event) =>
-                  void onChange((current) => ({
-                    ...current,
-                    tasks: current.tasks.map((item) =>
-                      item.id === task.id ? { ...item, status: event.target.value as TaskStatus } : item,
-                    ),
-                  }))
-                }
-              >
-                {taskStatuses.map((status) => <option key={status} value={status}>{taskStatusLabels[status]}</option>)}
-              </select>
-              <button
-                className="remove-task"
-                type="button"
-                aria-label={`Eliminar ${task.title}`}
-                onClick={() => void onChange((current) => ({ ...current, tasks: current.tasks.filter((item) => item.id !== task.id) }))}
-              >×</button>
-            </div>
+            <TaskItem key={task.id} task={task} people={people} onChange={onChange} />
           ))}
         </div>
       )}
@@ -217,8 +222,19 @@ function AreaPanel({
       {adding ? (
         <form className="task-form" onSubmit={addTask}>
           <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Tarea" aria-label="Tarea" />
-          <input required value={owner} onChange={(event) => setOwner(event.target.value)} placeholder="Responsable" aria-label="Responsable" />
+          <select required value={ownerSelection} onChange={(event) => setOwnerSelection(event.target.value)} aria-label="Responsable">
+            <option value="">Responsable</option>
+            {activePeople.map((person) => <option value={person.id} key={person.id}>{person.name}</option>)}
+            <option value="other">Otro…</option>
+          </select>
           <input required type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} aria-label="Fecha límite" />
+          {ownerSelection === "other" && (
+            <div className="task-custom-owner">
+              <input required value={customOwner} onChange={(event) => setCustomOwner(event.target.value)} placeholder="Nombre del responsable" aria-label="Nombre del responsable" />
+              <input type="tel" value={customOwnerPhone} onChange={(event) => setCustomOwnerPhone(event.target.value)} placeholder="Teléfono" aria-label="Teléfono del responsable" />
+              <input type="email" value={customOwnerEmail} onChange={(event) => setCustomOwnerEmail(event.target.value)} placeholder="Correo" aria-label="Correo del responsable" />
+            </div>
+          )}
           <button className="button button-primary button-small" type="submit">Agregar</button>
           <button className="button button-ghost button-small" type="button" onClick={() => setAdding(false)}>Cancelar</button>
         </form>
@@ -229,6 +245,115 @@ function AreaPanel({
   );
 }
 
+function TaskItem({
+  task,
+  people,
+  onChange,
+}: {
+  task: InitiativeTask;
+  people: PortalPerson[];
+  onChange: (update: (area: InitiativeArea) => InitiativeArea) => Promise<void>;
+}) {
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const notes = task.notes ?? [];
+  const contact = contactForOwner(task.ownerPersonId, task.ownerContact, people);
+
+  async function addNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!note.trim()) return;
+    await onChange((current) => ({
+      ...current,
+      tasks: current.tasks.map((item) =>
+        item.id === task.id
+          ? {
+              ...item,
+              notes: [
+                ...(item.notes ?? []),
+                { id: crypto.randomUUID(), text: note.trim(), createdAt: new Date().toISOString() },
+              ],
+            }
+          : item,
+      ),
+    }));
+    setNote("");
+    setNotesOpen(true);
+  }
+
+  return (
+    <article className="task-item">
+      <div className="task-row">
+        <div className="task-copy">
+          <strong>{task.title}</strong>
+          <span>{task.owner} · vence {formatDate(task.dueDate)}</span>
+          <OwnerContact contact={contact} />
+        </div>
+        <select
+          className={`status-select compact ${statusTone(task.status)}`}
+          value={task.status}
+          aria-label={`Estado de ${task.title}`}
+          onChange={(event) =>
+            void onChange((current) => ({
+              ...current,
+              tasks: current.tasks.map((item) =>
+                item.id === task.id ? { ...item, status: event.target.value as TaskStatus } : item,
+              ),
+            }))
+          }
+        >
+          {taskStatuses.map((status) => <option key={status} value={status}>{taskStatusLabels[status]}</option>)}
+        </select>
+        <button
+          className="remove-task"
+          type="button"
+          aria-label={`Eliminar ${task.title}`}
+          onClick={() => void onChange((current) => ({ ...current, tasks: current.tasks.filter((item) => item.id !== task.id) }))}
+        >×</button>
+      </div>
+      <button className="notes-toggle" type="button" onClick={() => setNotesOpen((current) => !current)}>
+        {notesOpen ? "Ocultar notas" : `Notas y evidencia${notes.length ? ` (${notes.length})` : ""}`}
+      </button>
+      {notesOpen && (
+        <div className="task-notes">
+          {notes.length > 0 && (
+            <div className="note-list">
+              {[...notes].reverse().map((item) => (
+                <div className="note-entry" key={item.id}>
+                  <p>{item.text}</p>
+                  <time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time>
+                </div>
+              ))}
+            </div>
+          )}
+          <form className="note-form" onSubmit={addNote}>
+            <textarea required rows={2} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Agrega una nota, bloqueo, acuerdo o evidencia…" aria-label={`Nueva nota para ${task.title}`} />
+            <button className="button button-primary button-small" type="submit">Guardar nota</button>
+          </form>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function OwnerContact({ contact }: { contact?: { phone: string; email: string } }) {
+  if (!contact?.phone && !contact?.email) return null;
+  return (
+    <span className="owner-contact">
+      {contact.phone && <a href={`tel:${contact.phone}`}>{contact.phone}</a>}
+      {contact.email && <a href={`mailto:${contact.email}`}>{contact.email}</a>}
+    </span>
+  );
+}
+
+function contactForOwner(
+  personId: string | undefined,
+  stored: { phone: string; email: string } | undefined,
+  people: PortalPerson[],
+) {
+  const person = people.find((item) => item.id === personId);
+  return person ? { phone: person.phone, email: person.email } : stored;
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(
     new Date(`${value}T12:00:00`),
@@ -237,4 +362,14 @@ function formatDate(value: string) {
 
 function initials(name: string) {
   return name.split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }

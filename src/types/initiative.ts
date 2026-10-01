@@ -26,12 +26,37 @@ export interface PortalUnit {
   updatedAt?: string;
 }
 
+export interface PortalPerson {
+  id: string;
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  active: boolean;
+  sortOrder: number;
+  updatedAt?: string;
+}
+
+export interface PortalContact {
+  phone: string;
+  email: string;
+}
+
+export interface TaskNote {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface InitiativeTask {
   id: string;
   title: string;
   owner: string;
+  ownerPersonId?: string;
+  ownerContact?: PortalContact;
   dueDate: string;
   status: TaskStatus;
+  notes: TaskNote[];
 }
 
 export interface InitiativeArea {
@@ -50,6 +75,8 @@ export interface Initiative {
   eventDate: string;
   location: string;
   owner: string;
+  ownerPersonId?: string;
+  ownerContact?: PortalContact;
   status: InitiativeStatus;
   scopeType: InitiativeScopeType;
   unitIds: string[];

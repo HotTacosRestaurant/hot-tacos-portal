@@ -1,4 +1,4 @@
-import type { PortalArea, PortalUnit } from "@/types/initiative";
+import type { PortalArea, PortalPerson, PortalUnit } from "@/types/initiative";
 
 export const DEFAULT_AREAS: PortalArea[] = [
   { id: "operations", name: "Operaciones", active: true, sortOrder: 10 },
@@ -17,9 +17,10 @@ export const DEFAULT_UNITS: PortalUnit[] = [
   { id: "htft", code: "HTFT", name: "Hot Tacos Food Truck", active: true, sortOrder: 30 },
 ];
 
+export const DEFAULT_PEOPLE: PortalPerson[] = [];
+
 export function mergeCatalog<T extends { id: string }>(defaults: T[], stored: T[]) {
   const items = new Map(defaults.map((item) => [item.id, item]));
   stored.forEach((item) => items.set(item.id, item));
   return [...items.values()];
 }
-
