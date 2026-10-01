@@ -2,21 +2,34 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Portal del Grupo Corporativo",
-    short_name: "GC Portal",
-    description: "Portal interno de coordinación del Grupo Corporativo",
+    name: "Business Transformation Portal",
+    short_name: "BT Portal",
+    description:
+      "Portal de iniciativas y coordinación del Grupo Corporativo",
     start_url: "/",
     display: "standalone",
-    background_color: "#fbfaf7",
-    theme_color: "#211e1a",
+    background_color: "#0D1B29",
+    theme_color: "#14283B",
     lang: "es",
     icons: [
       {
-        src: "/favicon.ico",
-        sizes: "any",
-        type: "image/x-icon",
+        src: "/bt-icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/bt-icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/bt-icon-maskable-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   };
 }
-

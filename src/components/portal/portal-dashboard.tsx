@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 import { CatalogModal, type CatalogTab } from "@/components/portal/catalog-modal";
@@ -221,7 +222,16 @@ export function PortalDashboard() {
   return (
     <main className="portal-shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="Portal del Grupo Corporativo"><span className="brand-mark">HT</span><span><strong>GRUPO CORPORATIVO</strong><small>PORTAL INTERNO</small></span></a>
+        <a className="brand" href="#top" aria-label="Portal del Grupo Corporativo">
+          <Image
+              className="brand-logo"
+              src="/bt-corporate-logo.svg"
+              alt=""
+              width={42}
+              height={42}
+              priority
+            />
+           <span><strong>GRUPO CORPORATIVO</strong><small>PORTAL INTERNO</small></span></a>
         <nav className="main-nav" aria-label="Navegación principal">
           <a className="active" href="#initiatives">Iniciativas</a>
           <button className="nav-button" type="button" onClick={() => openCatalog("areas")}>Catálogos</button>

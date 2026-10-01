@@ -42,7 +42,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .brand { align-items: center; color: white; display: flex; gap: 12px; text-decoration: none; width: fit-content; }
 .brand-mark {
-  align-items: center; background: var(--red); border-radius: 50%; display: flex; font-size: 12px;
+  align-items: center; background: #567387; border-radius: 50%; display: flex; font-size: 12px;
   font-weight: 900; height: 38px; justify-content: center; letter-spacing: -.5px; transform: rotate(-4deg); width: 38px;
 }
 .brand > span:last-child { display: flex; flex-direction: column; line-height: 1; }
@@ -70,7 +70,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .button { border: 0; border-radius: 7px; font-size: 13px; font-weight: 750; min-height: 42px; padding: 0 17px; transition: transform .15s, background .15s; }
 .button:hover { transform: translateY(-1px); }
 .button:disabled { cursor: wait; opacity: .65; }
-.button-primary { background: var(--red); color: white; box-shadow: 0 5px 14px rgba(200,56,45,.18); }
+.button-primary { background: #567387; color: white; box-shadow: 0 5px 14px rgba(200,56,45,.18); }
 .button-primary:hover { background: var(--red-dark); }
 .button-secondary { background: #efede8; color: var(--ink); }
 .button-ghost { background: transparent; color: var(--muted); }
@@ -81,7 +81,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .scope-navigation button { align-items: center; background: white; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); display: flex; gap: 10px; min-height: 58px; padding: 9px 12px; text-align: left; }
 .scope-navigation button:hover { border-color: #c9bdb0; }.scope-navigation button.active { background: #27231f; border-color: #27231f; color: white; box-shadow: 0 7px 18px rgba(39,35,31,.13); }
 .scope-navigation button > span:last-child { display: flex; flex-direction: column; min-width: 0; }.scope-navigation strong { font-size: 11px; }.scope-navigation small { color: #8e877e; font-size: 9px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.scope-navigation button.active small { color: #bdb6ad; }
-.scope-nav-code { align-items: center; background: #f0ece6; border-radius: 50%; color: #504941; display: flex; flex: 0 0 auto; font-size: 9px; font-weight: 900; height: 34px; justify-content: center; width: 34px; }.scope-navigation button.active .scope-nav-code { background: var(--red); color: white; }
+.scope-nav-code { align-items: center; background: #f0ece6; border-radius: 50%; color: #504941; display: flex; flex: 0 0 auto; font-size: 9px; font-weight: 900; height: 34px; justify-content: center; width: 34px; }.scope-navigation button.active .scope-nav-code { background: #567387; color: white; }
 .view-heading { align-items: end; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; margin: 0 0 18px; padding: 4px 0 14px; }.view-heading > div { display: flex; flex-direction: column; }.view-heading span { color: var(--muted); font-size: 9px; text-transform: uppercase; }.view-heading h2 { font-family: Georgia, serif; font-size: 22px; margin: 3px 0 0; }.data-indicator { color: var(--green) !important; font-weight: 800; letter-spacing: .04em; }
 
 .stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); margin-bottom: 24px; }
@@ -112,7 +112,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .empty-month:hover { background: white; border-color: var(--red); }
 
 .initiative-card { background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 20px rgba(39,31,22,.035); display: grid; grid-template-columns: 5px 1fr; overflow: hidden; }
-.initiative-accent { background: var(--red); }.initiative-main { min-width: 0; padding: 20px 22px 0; }
+.initiative-accent { background: #567387; }.initiative-main { min-width: 0; padding: 20px 22px 0; }
 .initiative-topline { align-items: start; display: flex; gap: 15px; justify-content: space-between; }
 .initiative-meta { color: var(--red); display: flex; font-size: 10px; font-weight: 800; gap: 5px; letter-spacing: .04em; margin-bottom: 5px; text-transform: uppercase; }
 .scope-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 6px; }
