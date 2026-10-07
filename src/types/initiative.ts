@@ -57,6 +57,9 @@ export interface InitiativeTask {
   dueDate: string;
   status: TaskStatus;
   notes: TaskNote[];
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
 }
 
 export interface InitiativeArea {
@@ -65,6 +68,8 @@ export interface InitiativeArea {
   name: string;
   status: InitiativeStatus;
   tasks: InitiativeTask[];
+  updatedAt?: string;
+  completedAt?: string;
 }
 
 export interface Initiative {

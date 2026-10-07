@@ -9,6 +9,7 @@ import { AdminLoginModal } from "@/components/portal/admin-login-modal";
 import { AdminUsersModal } from "@/components/portal/admin-users-modal";
 import { CatalogModal, type CatalogTab } from "@/components/portal/catalog-modal";
 import { InitiativeCard } from "@/components/portal/initiative-card";
+import { KpiDashboard } from "@/components/portal/kpi-dashboard";
 import { InitiativeModal } from "@/components/portal/initiative-modal";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { getPortalErrorDetails } from "@/lib/firebase-errors";
@@ -39,6 +40,7 @@ const AREAS_STORAGE_KEY = "hot-tacos-portal-areas-v1";
 const UNITS_STORAGE_KEY = "hot-tacos-portal-units-v1";
 const PEOPLE_STORAGE_KEY = "hot-tacos-portal-people-v1";
 type DataMode = "connecting" | "firebase" | "local" | "error";
+type PortalView = "initiatives" | "kpis";
 
 interface CriticalErrorState {
   title: string;
@@ -56,6 +58,7 @@ export function PortalDashboard() {
   const [people, setPeople] = useState<PortalPerson[]>(DEFAULT_PEOPLE);
   const [mode, setMode] = useState<DataMode>("connecting");
   const [selectedScope, setSelectedScope] = useState("brand");
+  const [activeView, setActiveView] = useState<PortalView>("initiatives");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogTab, setCatalogTab] = useState<CatalogTab>("areas");
@@ -75,6 +78,15 @@ export function PortalDashboard() {
 
   const isPortalSuperAdmin =
     isPortalAdmin && isPortalSuperAdminEmail(adminUser?.email);
+
+  useEffect(() => {
+    // Management Information is reserved exclusively for the three
+    // super-admin identities. If the session expires or the user signs
+    // out while viewing KPIs, immediately return to the operational view.
+    if (!isPortalSuperAdmin && activeView === "kpis") {
+      setActiveView("initiatives");
+    }
+  }, [isPortalSuperAdmin, activeView]);
 
   useEffect(() => {
     const authInstance = auth;
@@ -457,6 +469,7 @@ export function PortalDashboard() {
     setCatalogOpen(false);
     setAdminUsersOpen(false);
     setSelectedMonth(null);
+    setActiveView("initiatives");
     setToast("Sesión administrativa cerrada");
   }
 
@@ -474,7 +487,16 @@ export function PortalDashboard() {
             />
            <span><strong>GRUPO CORPORATIVO</strong><small>PORTAL INTERNO</small></span></a>
         <nav className="main-nav" aria-label="Navegación principal">
-          <a className="active" href="#initiatives">Iniciativas</a>
+          <button className={`nav-button ${activeView === "initiatives" ? "active" : ""}`} type="button" onClick={() => setActiveView("initiatives")}>Iniciativas</button>
+          {isPortalSuperAdmin && (
+            <button
+              className={`nav-button ${activeView === "kpis" ? "active" : ""}`}
+              type="button"
+              onClick={() => setActiveView("kpis")}
+            >
+              KPIs
+            </button>
+          )}
           <button className="nav-button" type="button" onClick={() => openCatalog("areas")}>Catálogos</button>
           <button className="nav-button" type="button" onClick={() => openCatalog("people")}>Equipo</button>
         </nav>
@@ -525,8 +547,14 @@ export function PortalDashboard() {
         )}
 
         <section className="hero" id="initiatives">
-          <div><p className="eyebrow">Centro de coordinación</p><h1>Iniciativas</h1><p>Planea eventos y proyectos, asigna responsables y da seguimiento a cada área.</p></div>
-          <button className="button button-primary hero-button" type="button" onClick={() => requestCreateInitiative(months[0].key)}><span aria-hidden="true">＋</span> Nueva iniciativa</button>
+          {activeView !== "kpis" || !isPortalSuperAdmin ? (
+            <>
+              <div><p className="eyebrow">Centro de coordinación</p><h1>Iniciativas</h1><p>Planea eventos y proyectos, asigna responsables y da seguimiento a cada área.</p></div>
+              <button className="button button-primary hero-button" type="button" onClick={() => requestCreateInitiative(months[0].key)}><span aria-hidden="true">＋</span> Nueva iniciativa</button>
+            </>
+          ) : (
+            <div><p className="eyebrow">Management information</p><h1>KPIs</h1><p>Detecta retrasos, falta de actualización, carga por área e integrante y tendencias de ejecución.</p></div>
+          )}
         </section>
 
         <section className="scope-navigation" aria-label="Ámbito de iniciativas">
@@ -548,6 +576,23 @@ export function PortalDashboard() {
           ))}
         </section>
 
+        {activeView === "kpis" && isPortalSuperAdmin ? (
+          <KpiDashboard
+            initiatives={initiatives}
+            units={units}
+            people={people}
+            selectedScope={selectedScope}
+            scopeTitle={scopeTitle}
+            onOpenInitiative={(title) => {
+              setQuery(title);
+              setPersonFilter("all");
+              setTaskStatusFilter("all");
+              setStatusFilter("all");
+              setActiveView("initiatives");
+            }}
+          />
+        ) : (
+          <>
         <div className="view-heading"><div><span>Mostrando iniciativas de</span><h2>{scopeTitle}</h2></div><span className={`data-indicator ${mode}`}>{modeLabel(mode)}</span></div>
 
         <section className="stat-grid" aria-label="Resumen">
@@ -575,6 +620,8 @@ export function PortalDashboard() {
             );
           })}
         </div>
+          </>
+        )}
       </div>
 
       {selectedMonth && (mode === "local" || isPortalAdmin) && <InitiativeModal monthKey={selectedMonth} areas={areas} units={units} people={people} initialScopeType={selectedScope === "brand" ? "brand" : "units"} initialUnitIds={selectedScope === "brand" ? [] : [selectedScope]} onClose={() => setSelectedMonth(null)} onSubmit={addInitiative} />}

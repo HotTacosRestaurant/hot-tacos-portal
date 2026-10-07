@@ -51,9 +51,18 @@ export function InitiativeCard({
     : 0;
 
   async function updateArea(areaId: string, update: (area: InitiativeArea) => InitiativeArea) {
+    const now = new Date().toISOString();
     await onChange({
       ...initiative,
-      areas: initiative.areas.map((area) => (area.id === areaId ? update(area) : area)),
+      areas: initiative.areas.map((area) => {
+        if (area.id !== areaId) return area;
+        const updated = update(area);
+        return {
+          ...updated,
+          updatedAt: now,
+          completedAt: updated.status === "ready" ? updated.completedAt ?? now : undefined,
+        };
+      }),
     });
   }
 
@@ -170,6 +179,7 @@ function AreaPanel({
     const owner = selectedPerson?.name ?? customOwner.trim();
     if (!title.trim() || !owner || !dueDate) return;
     try {
+      const now = new Date().toISOString();
       await onChange((current) => ({
         ...current,
         status: current.status === "notified" ? "in_progress" : current.status,
@@ -187,6 +197,8 @@ function AreaPanel({
             dueDate,
             status: "pending",
             notes: [],
+            createdAt: now,
+            updatedAt: now,
           },
         ],
       }));
@@ -279,6 +291,7 @@ function TaskItem({
           item.id === task.id
             ? {
                 ...item,
+                updatedAt: new Date().toISOString(),
                 notes: [
                   ...(item.notes ?? []),
                   { id: crypto.randomUUID(), text: note.trim(), createdAt: new Date().toISOString() },
@@ -309,9 +322,17 @@ function TaskItem({
           onChange={(event) =>
             void onChange((current) => ({
               ...current,
-              tasks: current.tasks.map((item) =>
-                item.id === task.id ? { ...item, status: event.target.value as TaskStatus } : item,
-              ),
+              tasks: current.tasks.map((item) => {
+                if (item.id !== task.id) return item;
+                const nextStatus = event.target.value as TaskStatus;
+                const now = new Date().toISOString();
+                return {
+                  ...item,
+                  status: nextStatus,
+                  updatedAt: now,
+                  completedAt: nextStatus === "done" ? item.completedAt ?? now : undefined,
+                };
+              }),
             })).catch(() => undefined)
           }
         >
