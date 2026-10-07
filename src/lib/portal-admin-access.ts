@@ -1,6 +1,7 @@
 export const PORTAL_SUPER_ADMIN_EMAILS = [
   "hottacosmanagement@hotmail.com",
   "admin@nixinx.com",
+  "admin@nixinex.com",
   "admin@hottacosrestaurant.com",
 ] as const;
 

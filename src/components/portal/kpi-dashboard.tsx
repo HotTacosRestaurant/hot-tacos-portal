@@ -18,6 +18,7 @@ interface KpiDashboardProps {
   selectedScope: string;
   scopeTitle: string;
   onOpenInitiative: (title: string) => void;
+  readOnly?: boolean;
 }
 
 export function KpiDashboard({
@@ -27,6 +28,7 @@ export function KpiDashboard({
   selectedScope,
   scopeTitle,
   onOpenInitiative,
+  readOnly = false,
 }: KpiDashboardProps) {
   const [query, setQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("all");
@@ -108,14 +110,25 @@ export function KpiDashboard({
         <Panel title="Excepciones a revisar" subtitle="Primero rojas, después amarillas">
           <div className="exception-list">
             {snapshot.exceptions.length ? snapshot.exceptions.map(({ initiative, detail }) => (
-              <button key={initiative.id} type="button" className="exception-row" onClick={() => onOpenInitiative(initiative.title)}>
-                <span className={`traffic-dot ${detail.health}`} aria-hidden="true" />
-                <span className="exception-copy">
-                  <strong>{initiative.title}</strong>
-                  <small>{detail.reasons.join(" · ")}</small>
-                </span>
-                <span className="exception-date">{formatDate(initiative.eventDate)}</span>
-              </button>
+              readOnly ? (
+                <div key={initiative.id} className="exception-row read-only">
+                  <span className={`traffic-dot ${detail.health}`} aria-hidden="true" />
+                  <span className="exception-copy">
+                    <strong>{initiative.title}</strong>
+                    <small>{detail.reasons.join(" · ")}</small>
+                  </span>
+                  <span className="exception-date">{formatDate(initiative.eventDate)}</span>
+                </div>
+              ) : (
+                <button key={initiative.id} type="button" className="exception-row" onClick={() => onOpenInitiative(initiative.title)}>
+                  <span className={`traffic-dot ${detail.health}`} aria-hidden="true" />
+                  <span className="exception-copy">
+                    <strong>{initiative.title}</strong>
+                    <small>{detail.reasons.join(" · ")}</small>
+                  </span>
+                  <span className="exception-date">{formatDate(initiative.eventDate)}</span>
+                </button>
+              )
             )) : <div className="kpi-empty">No hay excepciones con los filtros actuales.</div>}
           </div>
         </Panel>

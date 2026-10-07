@@ -29,6 +29,7 @@ function isPortalSuperAdmin() {
     request.auth.token.email in [
       'hottacosmanagement@hotmail.com',
       'admin@nixinx.com',
+      'admin@nixinex.com',
       'admin@hottacosrestaurant.com'
     ];
 }
