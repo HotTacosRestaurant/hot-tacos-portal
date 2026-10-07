@@ -23,6 +23,7 @@ interface InitiativeCardProps {
   initiative: Initiative;
   units: PortalUnit[];
   people: PortalPerson[];
+  canDelete: boolean;
   onChange: (initiative: Initiative) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
@@ -31,6 +32,7 @@ export function InitiativeCard({
   initiative,
   units,
   people,
+  canDelete,
   onChange,
   onDelete,
 }: InitiativeCardProps) {
@@ -83,7 +85,7 @@ export function InitiativeCard({
               void onChange({
                 ...initiative,
                 status: event.target.value as InitiativeStatus,
-              })
+              }).catch(() => undefined)
             }
           >
             {initiativeStatuses.map((status) => (
@@ -124,15 +126,19 @@ export function InitiativeCard({
                 onChange={(update) => updateArea(area.id, update)}
               />
             ))}
-            <button
-              className="danger-link"
-              type="button"
-              onClick={() => {
-                if (window.confirm(`¿Eliminar “${initiative.title}”?`)) void onDelete(initiative.id);
-              }}
-            >
-              Eliminar iniciativa
-            </button>
+            {canDelete && (
+              <button
+                className="danger-link"
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar “${initiative.title}”?`)) {
+                    void onDelete(initiative.id).catch(() => undefined);
+                  }
+                }}
+              >
+                Eliminar iniciativa
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -163,26 +169,30 @@ function AreaPanel({
     const selectedPerson = activePeople.find((person) => person.id === ownerSelection);
     const owner = selectedPerson?.name ?? customOwner.trim();
     if (!title.trim() || !owner || !dueDate) return;
-    await onChange((current) => ({
-      ...current,
-      status: current.status === "notified" ? "in_progress" : current.status,
-      tasks: [
-        ...current.tasks,
-        {
-          id: crypto.randomUUID(),
-          title: title.trim(),
-          owner,
-          ownerPersonId: selectedPerson?.id,
-          ownerContact: {
-            phone: selectedPerson?.phone ?? customOwnerPhone.trim(),
-            email: selectedPerson?.email ?? customOwnerEmail.trim(),
+    try {
+      await onChange((current) => ({
+        ...current,
+        status: current.status === "notified" ? "in_progress" : current.status,
+        tasks: [
+          ...current.tasks,
+          {
+            id: crypto.randomUUID(),
+            title: title.trim(),
+            owner,
+            ownerPersonId: selectedPerson?.id,
+            ownerContact: {
+              phone: selectedPerson?.phone ?? customOwnerPhone.trim(),
+              email: selectedPerson?.email ?? customOwnerEmail.trim(),
+            },
+            dueDate,
+            status: "pending",
+            notes: [],
           },
-          dueDate,
-          status: "pending",
-          notes: [],
-        },
-      ],
-    }));
+        ],
+      }));
+    } catch {
+      return;
+    }
     setTitle("");
     setOwnerSelection("");
     setCustomOwner("");
@@ -204,7 +214,7 @@ function AreaPanel({
             void onChange((current) => ({
               ...current,
               status: event.target.value as InitiativeStatus,
-            }))
+            })).catch(() => undefined)
           }
         >
           {initiativeStatuses.map((status) => <option key={status} value={status}>{initiativeStatusLabels[status]}</option>)}
@@ -262,20 +272,24 @@ function TaskItem({
   async function addNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!note.trim()) return;
-    await onChange((current) => ({
-      ...current,
-      tasks: current.tasks.map((item) =>
-        item.id === task.id
-          ? {
-              ...item,
-              notes: [
-                ...(item.notes ?? []),
-                { id: crypto.randomUUID(), text: note.trim(), createdAt: new Date().toISOString() },
-              ],
-            }
-          : item,
-      ),
-    }));
+    try {
+      await onChange((current) => ({
+        ...current,
+        tasks: current.tasks.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                notes: [
+                  ...(item.notes ?? []),
+                  { id: crypto.randomUUID(), text: note.trim(), createdAt: new Date().toISOString() },
+                ],
+              }
+            : item,
+        ),
+      }));
+    } catch {
+      return;
+    }
     setNote("");
     setNotesOpen(true);
   }
@@ -298,7 +312,7 @@ function TaskItem({
               tasks: current.tasks.map((item) =>
                 item.id === task.id ? { ...item, status: event.target.value as TaskStatus } : item,
               ),
-            }))
+            })).catch(() => undefined)
           }
         >
           {taskStatuses.map((status) => <option key={status} value={status}>{taskStatusLabels[status]}</option>)}
@@ -307,7 +321,12 @@ function TaskItem({
           className="remove-task"
           type="button"
           aria-label={`Eliminar ${task.title}`}
-          onClick={() => void onChange((current) => ({ ...current, tasks: current.tasks.filter((item) => item.id !== task.id) }))}
+          onClick={() =>
+            void onChange((current) => ({
+              ...current,
+              tasks: current.tasks.filter((item) => item.id !== task.id),
+            })).catch(() => undefined)
+          }
         >×</button>
       </div>
       <button className="notes-toggle" type="button" onClick={() => setNotesOpen((current) => !current)}>

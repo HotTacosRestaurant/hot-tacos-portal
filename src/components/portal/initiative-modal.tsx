@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+
+import { getPortalErrorDetails } from "@/lib/firebase-errors";
 
 import type {
   InitiativeDraft,
@@ -48,6 +50,8 @@ export function InitiativeModal({
     activeAreas.length ? [activeAreas[0].id] : [],
   );
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const monthLabel = useMemo(
     () =>
@@ -73,6 +77,22 @@ export function InitiativeModal({
     );
   }
 
+  const hasDraftData = Boolean(
+    title.trim() ||
+      description.trim() ||
+      location.trim() ||
+      ownerSelection ||
+      customOwner.trim() ||
+      customOwnerPhone.trim() ||
+      customOwnerEmail.trim(),
+  );
+
+  function requestClose() {
+    if (saving) return;
+    if (hasDraftData && !window.confirm("Hay información sin guardar. ¿Cerrar y descartarla?")) return;
+    onClose();
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const selectedPerson = activePeople.find((person) => person.id === ownerSelection);
@@ -84,6 +104,7 @@ export function InitiativeModal({
       (scopeType === "units" && selectedUnits.length === 0)
     ) return;
 
+    setSubmitError(null);
     setSaving(true);
     try {
       await onSubmit({
@@ -113,13 +134,22 @@ export function InitiativeModal({
           })),
       });
       onClose();
+    } catch (error) {
+      const details = getPortalErrorDetails(error);
+      setSubmitError(
+        `${details.message} Tus datos siguen en este formulario y la ventana permanecerá abierta. Código: ${details.code}.`,
+      );
+      window.requestAnimationFrame(() => {
+        errorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        errorRef.current?.focus();
+      });
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop" role="presentation" onMouseDown={requestClose}>
       <section
         className="modal-card"
         role="dialog"
@@ -132,7 +162,7 @@ export function InitiativeModal({
             <p className="eyebrow">{monthLabel}</p>
             <h2 id="new-initiative-title">Nueva iniciativa</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Cerrar">
+          <button className="icon-button" type="button" onClick={requestClose} aria-label="Cerrar">
             ×
           </button>
         </div>
@@ -241,8 +271,16 @@ export function InitiativeModal({
             {activeAreas.length === 0 && <p className="catalog-help">No hay áreas activas. Agrégalas desde Catálogos.</p>}
           </fieldset>
 
+          {submitError && (
+            <div className="form-save-error field-wide" role="alert" tabIndex={-1} ref={errorRef}>
+              <strong>NO SE GUARDÓ LA INICIATIVA</strong>
+              <p>{submitError}</p>
+              <small>No cierres esta ventana hasta guardar correctamente o copiar la información.</small>
+            </div>
+          )}
+
           <div className="modal-actions field-wide">
-            <button className="button button-secondary" type="button" onClick={onClose}>
+            <button className="button button-secondary" type="button" onClick={requestClose} disabled={saving}>
               Cancelar
             </button>
             <button className="button button-primary" type="submit" disabled={saving}>

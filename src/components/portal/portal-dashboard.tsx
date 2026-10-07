@@ -2,11 +2,17 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
+import { AdminLoginModal } from "@/components/portal/admin-login-modal";
+import { AdminUsersModal } from "@/components/portal/admin-users-modal";
 import { CatalogModal, type CatalogTab } from "@/components/portal/catalog-modal";
 import { InitiativeCard } from "@/components/portal/initiative-card";
 import { InitiativeModal } from "@/components/portal/initiative-modal";
-import { isFirebaseConfigured } from "@/lib/firebase";
+import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { getPortalErrorDetails } from "@/lib/firebase-errors";
+import { isPortalSuperAdminEmail } from "@/lib/portal-admin-access";
 import {
   createInitiative,
   removeInitiative,
@@ -32,7 +38,15 @@ const STORAGE_KEY = "hot-tacos-portal-initiatives-v1";
 const AREAS_STORAGE_KEY = "hot-tacos-portal-areas-v1";
 const UNITS_STORAGE_KEY = "hot-tacos-portal-units-v1";
 const PEOPLE_STORAGE_KEY = "hot-tacos-portal-people-v1";
-type DataMode = "connecting" | "firebase" | "local";
+type DataMode = "connecting" | "firebase" | "local" | "error";
+
+interface CriticalErrorState {
+  title: string;
+  message: string;
+  code: string;
+}
+
+const ALLOW_LOCAL_DEVELOPMENT = process.env.NODE_ENV === "development";
 
 export function PortalDashboard() {
   const months = useMemo(() => getRollingMonths(), []);
@@ -50,51 +64,153 @@ export function PortalDashboard() {
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
   const [personFilter, setPersonFilter] = useState("all");
   const [toast, setToast] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [criticalError, setCriticalError] = useState<CriticalErrorState | null>(null);
+  const [adminUser, setAdminUser] = useState<User | null>(null);
+  const [isPortalAdmin, setIsPortalAdmin] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [adminUsersOpen, setAdminUsersOpen] = useState(false);
+  const [pendingMonth, setPendingMonth] = useState<string | null>(null);
+  const [pendingCatalog, setPendingCatalog] = useState<CatalogTab | null>(null);
+
+  const isPortalSuperAdmin =
+    isPortalAdmin && isPortalSuperAdminEmail(adminUser?.email);
+
+  useEffect(() => {
+    const authInstance = auth;
+    const database = db;
+    if (!authInstance) return;
+
+    return onAuthStateChanged(authInstance, async (user) => {
+      setAdminUser(user);
+      setIsPortalAdmin(false);
+
+      if (!user || !database) return;
+
+      try {
+        const accessDocument = await getDoc(doc(database, "portal_users", user.uid));
+        const access = accessDocument.data() as { active?: boolean; role?: string } | undefined;
+        const allowed = accessDocument.exists() && access?.active === true && access?.role === "admin";
+
+        if (!allowed) {
+          setCriticalError({
+            title: "SIN PERMISOS ADMINISTRATIVOS",
+            message: "La cuenta inició sesión correctamente, pero no está habilitada como administrador del portal.",
+            code: "portal/not-admin",
+          });
+          await signOut(authInstance);
+          return;
+        }
+
+        setIsPortalAdmin(true);
+      } catch (error) {
+        console.error("[Portal admin verification failed]", error);
+        setCriticalError({
+          title: "NO SE PUDO VALIDAR EL ACCESO",
+          message: "Firebase Authentication inició sesión, pero Firestore no pudo confirmar los permisos administrativos.",
+          code: "portal/admin-check-failed",
+        });
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isPortalAdmin) return;
+
+    setAuthOpen(false);
+    if (pendingMonth) {
+      setSelectedMonth(pendingMonth);
+      setPendingMonth(null);
+    }
+    if (pendingCatalog) {
+      setCatalogTab(pendingCatalog);
+      setCatalogOpen(true);
+      setPendingCatalog(null);
+    }
+  }, [isPortalAdmin, pendingMonth, pendingCatalog]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
       queueMicrotask(() => {
-        setInitiatives(loadLocalInitiatives());
-        setAreas(loadLocalCatalog(AREAS_STORAGE_KEY, DEFAULT_AREAS));
-        setUnits(loadLocalCatalog(UNITS_STORAGE_KEY, DEFAULT_UNITS));
-        setPeople(loadLocalCatalog(PEOPLE_STORAGE_KEY, DEFAULT_PEOPLE));
-        setMode("local");
+        if (ALLOW_LOCAL_DEVELOPMENT) {
+          setInitiatives(loadLocalInitiatives());
+          setAreas(loadLocalCatalog(AREAS_STORAGE_KEY, DEFAULT_AREAS));
+          setUnits(loadLocalCatalog(UNITS_STORAGE_KEY, DEFAULT_UNITS));
+          setPeople(loadLocalCatalog(PEOPLE_STORAGE_KEY, DEFAULT_PEOPLE));
+          setMode("local");
+          return;
+        }
+
+        setMode("error");
+        setConnectionError(
+          "Firebase no está configurado en este despliegue. Los cambios están bloqueados para evitar guardar información sólo en este navegador.",
+        );
       });
       return;
     }
 
+    const ready = { initiatives: false, areas: false, units: false, people: false };
     const unsubscribers: Array<() => void> = [];
+
+    function markReady(key: keyof typeof ready) {
+      ready[key] = true;
+      if (Object.values(ready).every(Boolean)) {
+        setConnectionError(null);
+        setMode("firebase");
+      }
+    }
+
+    function markFailed(source: string, error: Error) {
+      console.error(`[Firestore subscription failed: ${source}]`, error);
+      const details = getPortalErrorDetails(error);
+      setMode("error");
+      setConnectionError(
+        `${source}: no se pudo confirmar la lectura desde Firestore. Código: ${details.code}. Recarga la aplicación después de corregir el problema.`,
+      );
+    }
+
     try {
       unsubscribers.push(
         subscribeToInitiatives(
           (data) => {
             setInitiatives(data);
-            setMode("firebase");
+            markReady("initiatives");
           },
-          () => {
-            setInitiatives(loadLocalInitiatives());
-            setMode("local");
-          },
+          (error) => markFailed("Iniciativas", error),
         ),
         subscribeToAreas(
-          (data) => setAreas(mergeCatalog(DEFAULT_AREAS, data)),
-          () => setAreas(DEFAULT_AREAS),
+          (data) => {
+            setAreas(mergeCatalog(DEFAULT_AREAS, data));
+            markReady("areas");
+          },
+          (error) => markFailed("Áreas", error),
         ),
         subscribeToUnits(
-          (data) => setUnits(mergeCatalog(DEFAULT_UNITS, data)),
-          () => setUnits(DEFAULT_UNITS),
+          (data) => {
+            setUnits(mergeCatalog(DEFAULT_UNITS, data));
+            markReady("units");
+          },
+          (error) => markFailed("Unidades", error),
         ),
         subscribeToPeople(
-          (data) => setPeople(data),
-          () => setPeople(DEFAULT_PEOPLE),
+          (data) => {
+            setPeople(data);
+            markReady("people");
+          },
+          (error) => markFailed("Personal", error),
         ),
       );
-    } catch {
+    } catch (error) {
+      const details = getPortalErrorDetails(error);
+      console.error("[Firestore initialization failed]", error);
       queueMicrotask(() => {
-        setInitiatives(loadLocalInitiatives());
-        setMode("local");
+        setMode("error");
+        setConnectionError(
+          `No se pudo iniciar Firestore. Código: ${details.code}. Recarga la aplicación después de revisar la configuración.`,
+        );
       });
     }
+
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, []);
 
@@ -151,72 +267,197 @@ export function PortalDashboard() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }
 
-  async function addInitiative(draft: InitiativeDraft) {
-    if (mode === "firebase") {
-      try {
-        await createInitiative(draft);
-        setToast("Iniciativa guardada en Firestore");
-      } catch {
-        setToast("Firestore rechazó la creación. Revisa las reglas del portal.");
-      }
+  function ensureWriteAvailable(action: string) {
+    if (mode === "firebase" || mode === "local") return;
+
+    const error = new Error(
+      `No se puede ${action} porque la aplicación no tiene una conexión confirmada con Firestore.`,
+    ) as Error & { code?: string };
+    error.code = "portal/not-ready";
+    reportWriteFailure(action, error);
+    throw error;
+  }
+
+  function reportWriteFailure(action: string, error: unknown) {
+    const details = getPortalErrorDetails(error);
+    console.error(`[Portal write failed: ${action}]`, error);
+    setCriticalError({
+      title: details.title,
+      message: `${details.message} Acción: ${action}.`,
+      code: details.code,
+    });
+  }
+
+  function ensureAdmin(action: string) {
+    if (mode === "local" || isPortalAdmin) return;
+
+    setAuthOpen(true);
+    const error = new Error(`Se requiere acceso administrativo para ${action}.`) as Error & { code?: string };
+    error.code = "portal/admin-required";
+    reportWriteFailure(action, error);
+    throw error;
+  }
+
+  function requestCreateInitiative(monthKey: string) {
+    if (mode === "local" || isPortalAdmin) {
+      setSelectedMonth(monthKey);
       return;
     }
-    const now = new Date().toISOString();
-    saveLocalInitiatives([...initiatives, { ...draft, id: crypto.randomUUID(), createdAt: now, updatedAt: now }]);
-    setToast("Iniciativa creada en modo local");
+
+    setPendingMonth(monthKey);
+    setAuthOpen(true);
+  }
+
+  async function addInitiative(draft: InitiativeDraft) {
+    ensureWriteAvailable("crear la iniciativa");
+    ensureAdmin("crear la iniciativa");
+    setCriticalError(null);
+
+    if (mode === "local") {
+      const now = new Date().toISOString();
+      saveLocalInitiatives([
+        ...initiatives,
+        { ...draft, id: crypto.randomUUID(), createdAt: now, updatedAt: now },
+      ]);
+      setToast("Iniciativa creada en modo local de desarrollo");
+      return;
+    }
+
+    try {
+      await createInitiative(draft);
+      setToast("Iniciativa guardada en Firestore");
+    } catch (error) {
+      reportWriteFailure("crear la iniciativa", error);
+      throw error;
+    }
   }
 
   async function updateInitiative(updated: Initiative) {
-    const next = initiatives.map((item) => item.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : item);
-    if (mode === "firebase") {
-      try { await saveInitiative(updated); } catch { setToast("Firestore rechazó el cambio."); }
+    ensureWriteAvailable("actualizar la iniciativa");
+    setCriticalError(null);
+    const next = initiatives.map((item) =>
+      item.id === updated.id
+        ? { ...updated, updatedAt: new Date().toISOString() }
+        : item,
+    );
+
+    if (mode === "local") {
+      saveLocalInitiatives(next);
       return;
     }
-    saveLocalInitiatives(next);
+
+    try {
+      await saveInitiative(updated);
+      setToast("Cambios guardados en Firestore");
+    } catch (error) {
+      reportWriteFailure("actualizar la iniciativa", error);
+      throw error;
+    }
   }
 
   async function deleteInitiative(id: string) {
+    ensureWriteAvailable("eliminar la iniciativa");
+    ensureAdmin("eliminar la iniciativa");
+    setCriticalError(null);
     const next = initiatives.filter((item) => item.id !== id);
-    if (mode === "firebase") {
-      try { await removeInitiative(id); setToast("Iniciativa eliminada"); } catch { setToast("Firestore rechazó la eliminación."); }
+
+    if (mode === "local") {
+      saveLocalInitiatives(next);
+      setToast("Iniciativa eliminada en modo local de desarrollo");
       return;
     }
-    saveLocalInitiatives(next);
+
+    try {
+      await removeInitiative(id);
+      setToast("Iniciativa eliminada");
+    } catch (error) {
+      reportWriteFailure("eliminar la iniciativa", error);
+      throw error;
+    }
   }
 
   async function updateArea(area: PortalArea) {
+    ensureWriteAvailable("actualizar el catálogo de áreas");
+    ensureAdmin("actualizar el catálogo de áreas");
+    setCriticalError(null);
     const next = upsertCatalog(areas, area, DEFAULT_AREAS);
-    setAreas(next);
-    if (mode === "firebase") {
-      try { await saveArea(area); setToast("Catálogo de áreas actualizado"); } catch { setToast("Firestore rechazó el cambio de catálogo."); }
-    } else {
+
+    if (mode === "local") {
+      setAreas(next);
       window.localStorage.setItem(AREAS_STORAGE_KEY, JSON.stringify(next));
+      return;
+    }
+
+    try {
+      await saveArea(area);
+      setToast("Catálogo de áreas actualizado");
+    } catch (error) {
+      reportWriteFailure("actualizar el catálogo de áreas", error);
+      throw error;
     }
   }
 
   async function updateUnit(unit: PortalUnit) {
+    ensureWriteAvailable("actualizar el catálogo de unidades");
+    ensureAdmin("actualizar el catálogo de unidades");
+    setCriticalError(null);
     const next = upsertCatalog(units, unit, DEFAULT_UNITS);
-    setUnits(next);
-    if (mode === "firebase") {
-      try { await saveUnit(unit); setToast("Catálogo de unidades actualizado"); } catch { setToast("Firestore rechazó el cambio de catálogo."); }
-    } else {
+
+    if (mode === "local") {
+      setUnits(next);
       window.localStorage.setItem(UNITS_STORAGE_KEY, JSON.stringify(next));
+      return;
+    }
+
+    try {
+      await saveUnit(unit);
+      setToast("Catálogo de unidades actualizado");
+    } catch (error) {
+      reportWriteFailure("actualizar el catálogo de unidades", error);
+      throw error;
     }
   }
 
   async function updatePerson(person: PortalPerson) {
+    ensureWriteAvailable("actualizar el catálogo de personal");
+    ensureAdmin("actualizar el catálogo de personal");
+    setCriticalError(null);
     const next = upsertCatalog(people, person, DEFAULT_PEOPLE);
-    setPeople(next);
-    if (mode === "firebase") {
-      try { await savePerson(person); setToast("Catálogo de personal actualizado"); } catch { setToast("Firestore rechazó el cambio de personal."); }
-    } else {
+
+    if (mode === "local") {
+      setPeople(next);
       window.localStorage.setItem(PEOPLE_STORAGE_KEY, JSON.stringify(next));
+      return;
+    }
+
+    try {
+      await savePerson(person);
+      setToast("Catálogo de personal actualizado");
+    } catch (error) {
+      reportWriteFailure("actualizar el catálogo de personal", error);
+      throw error;
     }
   }
 
   function openCatalog(tab: CatalogTab) {
-    setCatalogTab(tab);
-    setCatalogOpen(true);
+    if (mode === "local" || isPortalAdmin) {
+      setCatalogTab(tab);
+      setCatalogOpen(true);
+      return;
+    }
+
+    setPendingCatalog(tab);
+    setAuthOpen(true);
+  }
+
+  async function handleSignOut() {
+    const authInstance = auth;
+    if (!authInstance) return;
+    await signOut(authInstance);
+    setCatalogOpen(false);
+    setAdminUsersOpen(false);
+    setSelectedMonth(null);
+    setToast("Sesión administrativa cerrada");
   }
 
   return (
@@ -237,15 +478,55 @@ export function PortalDashboard() {
           <button className="nav-button" type="button" onClick={() => openCatalog("areas")}>Catálogos</button>
           <button className="nav-button" type="button" onClick={() => openCatalog("people")}>Equipo</button>
         </nav>
-        <div className="user-menu"><span className="avatar dark">A</span><span>Administración</span></div>
+        <div className="user-menu">
+          {isPortalAdmin ? (
+            <>
+              <span className="avatar dark">A</span>
+              <span>{adminUser?.email ?? "Administración"}</span>
+              {isPortalSuperAdmin && (
+                <button
+                  className="user-action master-admin-action"
+                  type="button"
+                  onClick={() => setAdminUsersOpen(true)}
+                >
+                  Administradores
+                </button>
+              )}
+              <button className="user-action" type="button" onClick={() => void handleSignOut()}>Salir</button>
+            </>
+          ) : (
+            <button className="admin-login-button" type="button" onClick={() => setAuthOpen(true)}>
+              <span className="avatar dark">A</span>
+              <span>Acceso admin</span>
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="portal-content" id="top">
-        {mode === "local" && <div className="mode-banner" role="status"><span>Vista local</span>Firestore todavía no permite acceder a las colecciones del portal. Los cambios se guardan únicamente en este navegador.</div>}
+        {mode === "connecting" && (
+          <div className="mode-banner" role="status">
+            <span>Conectando</span>
+            Confirmando conexión con Firestore. No cierres la aplicación mientras carga.
+          </div>
+        )}
+        {mode === "local" && (
+          <div className="mode-banner" role="status">
+            <span>Desarrollo local</span>
+            Firestore no está configurado. Este modo sólo está habilitado durante desarrollo y los cambios viven únicamente en este navegador.
+          </div>
+        )}
+        {mode === "error" && (
+          <div className="mode-banner denied" role="alert">
+            <span>Firestore sin confirmar</span>
+            <strong>Los cambios están bloqueados.</strong> {connectionError}
+            <button className="banner-action" type="button" onClick={() => window.location.reload()}>Recargar</button>
+          </div>
+        )}
 
         <section className="hero" id="initiatives">
           <div><p className="eyebrow">Centro de coordinación</p><h1>Iniciativas</h1><p>Planea eventos y proyectos, asigna responsables y da seguimiento a cada área.</p></div>
-          <button className="button button-primary hero-button" type="button" onClick={() => setSelectedMonth(months[0].key)}><span aria-hidden="true">＋</span> Nueva iniciativa</button>
+          <button className="button button-primary hero-button" type="button" onClick={() => requestCreateInitiative(months[0].key)}><span aria-hidden="true">＋</span> Nueva iniciativa</button>
         </section>
 
         <section className="scope-navigation" aria-label="Ámbito de iniciativas">
@@ -267,7 +548,7 @@ export function PortalDashboard() {
           ))}
         </section>
 
-        <div className="view-heading"><div><span>Mostrando iniciativas de</span><h2>{scopeTitle}</h2></div><span className="data-indicator">{mode === "firebase" ? "● Firestore" : "● Local"}</span></div>
+        <div className="view-heading"><div><span>Mostrando iniciativas de</span><h2>{scopeTitle}</h2></div><span className={`data-indicator ${mode}`}>{modeLabel(mode)}</span></div>
 
         <section className="stat-grid" aria-label="Resumen">
           <StatCard value={stats.active} label="Iniciativas activas" tone="red" /><StatCard value={stats.upcoming} label="En los próximos 14 días" tone="yellow" /><StatCard value={stats.ready} label="Listas" tone="green" /><StatCard value={stats.blocked} label="Requieren atención" tone="dark" />
@@ -287,8 +568,8 @@ export function PortalDashboard() {
               <section className="month-section" key={month.key}>
                 <div className="month-rail"><span>{month.short}</span><strong>{month.year}</strong></div>
                 <div className="month-content">
-                  <div className="month-heading"><div><h2>{month.label}</h2><span>{monthInitiatives.length} {monthInitiatives.length === 1 ? "iniciativa" : "iniciativas"}</span></div><button className="add-month" type="button" onClick={() => setSelectedMonth(month.key)}>＋ Agregar</button></div>
-                  {monthInitiatives.length ? <div className="initiative-list">{monthInitiatives.map((initiative) => <InitiativeCard key={initiative.id} initiative={initiative} units={units} people={people} onChange={updateInitiative} onDelete={deleteInitiative} />)}</div> : <button className="empty-month" type="button" onClick={() => setSelectedMonth(month.key)}><span>＋</span><strong>Sin iniciativas planeadas</strong><small>Agrega la primera iniciativa de {month.label.toLowerCase()} para {scopeTitle}</small></button>}
+                  <div className="month-heading"><div><h2>{month.label}</h2><span>{monthInitiatives.length} {monthInitiatives.length === 1 ? "iniciativa" : "iniciativas"}</span></div><button className="add-month" type="button" onClick={() => requestCreateInitiative(month.key)}>＋ Agregar</button></div>
+                  {monthInitiatives.length ? <div className="initiative-list">{monthInitiatives.map((initiative) => <InitiativeCard key={initiative.id} initiative={initiative} units={units} people={people} canDelete={mode === "local" || isPortalAdmin} onChange={updateInitiative} onDelete={deleteInitiative} />)}</div> : <button className="empty-month" type="button" onClick={() => requestCreateInitiative(month.key)}><span>＋</span><strong>Sin iniciativas planeadas</strong><small>Agrega la primera iniciativa de {month.label.toLowerCase()} para {scopeTitle}</small></button>}
                 </div>
               </section>
             );
@@ -296,11 +577,36 @@ export function PortalDashboard() {
         </div>
       </div>
 
-      {selectedMonth && <InitiativeModal monthKey={selectedMonth} areas={areas} units={units} people={people} initialScopeType={selectedScope === "brand" ? "brand" : "units"} initialUnitIds={selectedScope === "brand" ? [] : [selectedScope]} onClose={() => setSelectedMonth(null)} onSubmit={addInitiative} />}
-      {catalogOpen && <CatalogModal areas={areas} units={units} people={people} initialTab={catalogTab} onClose={() => setCatalogOpen(false)} onSaveArea={updateArea} onSaveUnit={updateUnit} onSavePerson={updatePerson} />}
+      {selectedMonth && (mode === "local" || isPortalAdmin) && <InitiativeModal monthKey={selectedMonth} areas={areas} units={units} people={people} initialScopeType={selectedScope === "brand" ? "brand" : "units"} initialUnitIds={selectedScope === "brand" ? [] : [selectedScope]} onClose={() => setSelectedMonth(null)} onSubmit={addInitiative} />}
+      {catalogOpen && (mode === "local" || isPortalAdmin) && <CatalogModal areas={areas} units={units} people={people} initialTab={catalogTab} onClose={() => setCatalogOpen(false)} onSaveArea={updateArea} onSaveUnit={updateUnit} onSavePerson={updatePerson} />}
+      {adminUsersOpen && isPortalSuperAdmin && (
+        <AdminUsersModal
+          currentUserId={adminUser?.uid ?? null}
+          onClose={() => setAdminUsersOpen(false)}
+        />
+      )}
+      {authOpen && !isPortalAdmin && <AdminLoginModal onClose={() => { setAuthOpen(false); setPendingMonth(null); setPendingCatalog(null); }} />}
+      {criticalError && (
+        <div className="critical-alert" role="alert" aria-live="assertive">
+          <div className="critical-alert-icon" aria-hidden="true">!</div>
+          <div>
+            <strong>{criticalError.title}</strong>
+            <p>{criticalError.message}</p>
+            <small>Código: {criticalError.code}</small>
+          </div>
+          <button type="button" onClick={() => setCriticalError(null)} aria-label="Cerrar aviso">×</button>
+        </div>
+      )}
       {toast && <div className="toast" role="status">{toast}</div>}
     </main>
   );
+}
+
+function modeLabel(mode: DataMode) {
+  if (mode === "firebase") return "● Firestore conectado";
+  if (mode === "connecting") return "● Conectando";
+  if (mode === "error") return "● Firestore sin confirmar";
+  return "● Local desarrollo";
 }
 
 function StatCard({ value, label, tone }: { value: number; label: string; tone: string }) { return <article className={`stat-card ${tone}`}><span>{value}</span><p>{label}</p></article>; }

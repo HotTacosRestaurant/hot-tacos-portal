@@ -98,47 +98,62 @@ export function subscribeToPeople(
 export async function saveArea(area: PortalArea) {
   const database = requireDatabase();
   const { id, ...data } = area;
-  await setDoc(doc(database, AREAS_COLLECTION, id), {
-    ...data,
-    updatedAt: new Date().toISOString(),
-  });
+  await setDoc(
+    doc(database, AREAS_COLLECTION, id),
+    sanitizeForFirestore({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
 }
 
 export async function saveUnit(unit: PortalUnit) {
   const database = requireDatabase();
   const { id, ...data } = unit;
-  await setDoc(doc(database, UNITS_COLLECTION, id), {
-    ...data,
-    updatedAt: new Date().toISOString(),
-  });
+  await setDoc(
+    doc(database, UNITS_COLLECTION, id),
+    sanitizeForFirestore({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
 }
 
 export async function savePerson(person: PortalPerson) {
   const database = requireDatabase();
   const { id, ...data } = person;
-  await setDoc(doc(database, PEOPLE_COLLECTION, id), {
-    ...data,
-    updatedAt: new Date().toISOString(),
-  });
+  await setDoc(
+    doc(database, PEOPLE_COLLECTION, id),
+    sanitizeForFirestore({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
 }
 
 export async function createInitiative(draft: InitiativeDraft) {
   const database = requireDatabase();
   const now = new Date().toISOString();
-  await addDoc(collection(database, COLLECTION), {
-    ...draft,
-    createdAt: now,
-    updatedAt: now,
-  });
+  await addDoc(
+    collection(database, COLLECTION),
+    sanitizeForFirestore({
+      ...draft,
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
 }
 
 export async function saveInitiative(initiative: Initiative) {
   const database = requireDatabase();
   const { id, ...data } = initiative;
-  await setDoc(doc(database, COLLECTION, id), {
-    ...data,
-    updatedAt: new Date().toISOString(),
-  });
+  await setDoc(
+    doc(database, COLLECTION, id),
+    sanitizeForFirestore({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
 }
 
 export async function removeInitiative(id: string) {
@@ -159,4 +174,20 @@ function normalizeInitiative(initiative: Initiative): Initiative {
       })),
     })),
   };
+}
+
+
+function sanitizeForFirestore<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForFirestore(item)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    const cleanEntries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, sanitizeForFirestore(item)]);
+    return Object.fromEntries(cleanEntries) as T;
+  }
+
+  return value;
 }

@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 
+import { getPortalErrorDetails } from "@/lib/firebase-errors";
+
 import type { PortalArea, PortalPerson, PortalUnit } from "@/types/initiative";
 
 export type CatalogTab = "areas" | "units" | "people";
@@ -37,50 +39,79 @@ export function CatalogModal({
   const [personEmail, setPersonEmail] = useState("");
   const [peopleQuery, setPeopleQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const hasUnsavedFormData = Boolean(
+    areaName.trim() ||
+      unitCode.trim() ||
+      unitName.trim() ||
+      personName.trim() ||
+      personRole.trim() ||
+      personPhone.trim() ||
+      personEmail.trim(),
+  );
+
+  function requestClose() {
+    if (saving) return;
+    if (hasUnsavedFormData && !window.confirm("Hay información sin guardar. ¿Cerrar y descartarla?")) return;
+    onClose();
+  }
+
+  async function runCatalogWrite(action: string, operation: () => Promise<void>) {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await operation();
+      return true;
+    } catch (error) {
+      const details = getPortalErrorDetails(error);
+      setSaveError(
+        `${details.message} El cambio de ${action} NO se guardó. Código: ${details.code}.`,
+      );
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function addArea(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!areaName.trim()) return;
-    setSaving(true);
-    try {
-      await onSaveArea({
+    const saved = await runCatalogWrite("área", () =>
+      onSaveArea({
         id: crypto.randomUUID(),
         name: areaName.trim(),
         active: true,
         sortOrder: (areas.at(-1)?.sortOrder ?? 0) + 10,
-      });
-      setAreaName("");
-    } finally {
-      setSaving(false);
-    }
+      }),
+    );
+    if (saved) setAreaName("");
   }
 
   async function addUnit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = unitCode.trim().toUpperCase();
     if (!code || !unitName.trim()) return;
-    setSaving(true);
-    try {
-      await onSaveUnit({
+    const saved = await runCatalogWrite("unidad", () =>
+      onSaveUnit({
         id: crypto.randomUUID(),
         code,
         name: unitName.trim(),
         active: true,
         sortOrder: (units.at(-1)?.sortOrder ?? 0) + 10,
-      });
+      }),
+    );
+    if (saved) {
       setUnitCode("");
       setUnitName("");
-    } finally {
-      setSaving(false);
     }
   }
 
   async function addPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!personName.trim()) return;
-    setSaving(true);
-    try {
-      await onSavePerson({
+    const saved = await runCatalogWrite("persona", () =>
+      onSavePerson({
         id: crypto.randomUUID(),
         name: personName.trim(),
         role: personRole.trim(),
@@ -88,13 +119,13 @@ export function CatalogModal({
         email: personEmail.trim(),
         active: true,
         sortOrder: (people.at(-1)?.sortOrder ?? 0) + 10,
-      });
+      }),
+    );
+    if (saved) {
       setPersonName("");
       setPersonRole("");
       setPersonPhone("");
       setPersonEmail("");
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -105,7 +136,7 @@ export function CatalogModal({
   );
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop" role="presentation" onMouseDown={requestClose}>
       <section
         className="modal-card catalog-modal"
         role="dialog"
@@ -118,7 +149,7 @@ export function CatalogModal({
             <p className="eyebrow">Configuración</p>
             <h2 id="catalog-title">Catálogos del portal</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Cerrar">×</button>
+          <button className="icon-button" type="button" onClick={requestClose} aria-label="Cerrar">×</button>
         </div>
 
         <div className="catalog-tabs" role="tablist">
@@ -127,6 +158,14 @@ export function CatalogModal({
           <button className={tab === "people" ? "active" : ""} type="button" onClick={() => setTab("people")}>Personal</button>
         </div>
 
+        {saveError && (
+          <div className="form-save-error catalog-save-error" role="alert">
+            <strong>NO SE GUARDÓ EL CAMBIO</strong>
+            <p>{saveError}</p>
+            <small>La información escrita en el formulario se conserva para que puedas reintentar.</small>
+          </div>
+        )}
+
         {tab === "areas" ? (
           <div className="catalog-panel">
             <p className="catalog-help">Las áreas inactivas dejan de aparecer en iniciativas nuevas, pero permanecen en el historial.</p>
@@ -134,7 +173,7 @@ export function CatalogModal({
               {areas.map((area) => (
                 <div className="catalog-row" key={area.id}>
                   <div><strong>{area.name}</strong><small>{area.active ? "Activa" : "Inactiva"}</small></div>
-                  <label className="switch"><input type="checkbox" checked={area.active} onChange={() => void onSaveArea({ ...area, active: !area.active })} /><span /></label>
+                  <label className="switch"><input type="checkbox" checked={area.active} disabled={saving} onChange={() => void runCatalogWrite("área", () => onSaveArea({ ...area, active: !area.active }))} /><span /></label>
                 </div>
               ))}
             </div>
@@ -150,7 +189,7 @@ export function CatalogModal({
               {units.map((unit) => (
                 <div className="catalog-row" key={unit.id}>
                   <div><strong><span className="unit-code">{unit.code}</span>{unit.name}</strong><small>{unit.active ? "Activa" : "Inactiva"}</small></div>
-                  <label className="switch"><input type="checkbox" checked={unit.active} onChange={() => void onSaveUnit({ ...unit, active: !unit.active })} /><span /></label>
+                  <label className="switch"><input type="checkbox" checked={unit.active} disabled={saving} onChange={() => void runCatalogWrite("unidad", () => onSaveUnit({ ...unit, active: !unit.active }))} /><span /></label>
                 </div>
               ))}
             </div>
@@ -174,7 +213,7 @@ export function CatalogModal({
                     <strong>{person.name}</strong>
                     <small>{[person.role, person.phone, person.email].filter(Boolean).join(" · ") || "Sin datos de contacto"}</small>
                   </div>
-                  <label className="switch"><input type="checkbox" checked={person.active} onChange={() => void onSavePerson({ ...person, active: !person.active })} /><span /></label>
+                  <label className="switch"><input type="checkbox" checked={person.active} disabled={saving} onChange={() => void runCatalogWrite("persona", () => onSavePerson({ ...person, active: !person.active }))} /><span /></label>
                 </div>
               ))}
               {visiblePeople.length === 0 && <p className="catalog-empty">No hay personas que coincidan.</p>}
