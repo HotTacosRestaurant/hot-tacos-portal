@@ -68,7 +68,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es">
+    <html lang="es" translate="no">
+      <head>
+        <meta name="google" content="notranslate" />
+      </head>
       <body>
         {children}
         <PwaRegister />
